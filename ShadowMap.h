@@ -2,6 +2,7 @@
 
 #include <functional>
 
+#include "Frustum.h"
 #include "Light.h"
 #include "raylib.h"
 
@@ -21,8 +22,9 @@ public:
     // Regiao do mundo coberta pela sombra da luz direcional (esfera: centro + raio).
     void SetFocus(Vector3 center, float radius);
 
-    // Renderiza a cena (drawDepth) do ponto de vista da luz, so profundidade.
-    void Render(const Light& light, const std::function<void()>& drawDepth);
+    // Renderiza a cena (drawDepth) do ponto de vista da luz, so profundidade. O callback recebe o
+    // frustum da luz: objetos fora dele nao entram no shadow map e podem ser pulados.
+    void Render(const Light& light, const std::function<void(const Frustum&)>& drawDepth);
 
     // Liga/desliga a textura de profundidade numa unidade de textura do OpenGL.
     void Bind(int slot) const;

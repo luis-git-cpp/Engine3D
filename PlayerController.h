@@ -25,7 +25,9 @@ public:
 
     // Le o teclado (WASD, Shift, Espaco) e o mouse e move o jogador. Chamar 1x por quadro.
     // lookEnabled = false ignora o mouse neste quadro (ex.: logo depois de capturar o cursor).
-    void Update(float dt, bool lookEnabled);
+    // Devolve true se o jogador caiu para fora do mundo e reapareceu no ponto inicial neste quadro
+    // (quem usa streaming deve carregar o entorno do novo ponto).
+    bool Update(float dt, bool lookEnabled);
 
     // Camera do jogador. Na 3a pessoa, a colisao da camera e feita aqui.
     Camera3D BuildCamera(bool thirdPerson, float dt);

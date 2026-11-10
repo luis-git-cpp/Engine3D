@@ -83,10 +83,10 @@ void PlayerController::LookAt(Vector3 direction)
     m_pitch = std::asin(std::clamp(d.y, -1.0f, 1.0f));
 }
 
-void PlayerController::Update(float dt, bool lookEnabled)
+bool PlayerController::Update(float dt, bool lookEnabled)
 {
     GameObject* body = m_objects.Get(m_id);
-    if (body == nullptr) return;
+    if (body == nullptr) return false;
 
     // Olhar com o mouse.
     if (lookEnabled)
@@ -125,7 +125,12 @@ void PlayerController::Update(float dt, bool lookEnabled)
 
     // Caiu para fora do mundo: volta ao ponto inicial.
     if (body->position.y < kRespawnHeight)
+    {
         Spawn(m_spawn, m_yaw * RAD2DEG);
+        return true;
+    }
+
+    return false;
 }
 
 Camera3D PlayerController::BuildCamera(bool thirdPerson, float dt)

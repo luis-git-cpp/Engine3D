@@ -70,6 +70,7 @@ struct GameObject
     // --- Visual ---
     Model model{};
     BoundingBox localBounds{}; // caixa do modelo, sem escala nem posicao
+    BoundingBox bounds{};      // caixa no mundo (visual + colisor); o ObjectManager mantem atualizada
     bool visible = true;       // desenhado na passada final
     bool castShadow = true;    // desenhado nos shadow maps (mesmo invisivel)
 

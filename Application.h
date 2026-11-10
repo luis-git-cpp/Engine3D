@@ -57,6 +57,7 @@ private:
     void UpdatePlaying();
     void UpdatePaused();
     void UpdateLights();
+    Vector3 StreamFocus() const; // ponto ao redor do qual o mundo e carregado (jogador ou camera)
 
     // Jogo
     void HandleGameInput();
@@ -101,6 +102,7 @@ private:
     bool m_quit = false;
     bool m_skipCameraFrame = false;
     bool m_showColliders = false;
+    bool m_showCells = false;
     float m_time = 0.0f; // tempo de animacao (para quando o jogo esta pausado)
 
     RaycastHit m_aimHit;                 // o que esta no centro da tela

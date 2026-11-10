@@ -223,9 +223,10 @@ void ObjectManager::UpdateSpatialIndex()
 void ObjectManager::Reindex(GameObject& obj)
 {
     obj.cell = m_coords.ToCell(obj.position);
+    obj.bounds = obj.WorldBounds(); // em cache: usada no culling e nas consultas
 
     CellCoord minCell, maxCell;
-    m_coords.CellRange(obj.WorldBounds(), minCell, maxCell);
+    m_coords.CellRange(obj.bounds, minCell, maxCell);
 
     if (obj.indexed && minCell == obj.cellMin && maxCell == obj.cellMax) return;
 

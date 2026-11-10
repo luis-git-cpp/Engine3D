@@ -49,6 +49,11 @@ uniform vec3 ambientColor;   // cor * intensidade da luz global
 uniform float shininess;
 uniform float specularStrength;
 
+// Neblina (cor em sRGB, distancias em metros da camera)
+uniform vec3 fogColor;
+uniform float fogStart;
+uniform float fogEnd;
+
 // Shadow maps: um por luz que projeta sombra.
 // Em GLSL 330 um array de samplers so pode ser indexado por constante, entao sao 4 samplers
 // separados e a funcao ShadowDepth escolhe o certo.
@@ -194,6 +199,11 @@ void main()
 
     vec3 color = albedo * diffuse + specular;
     color = pow(color, vec3(1.0 / 2.2));              // linear -> sRGB
+
+    // Neblina: longe, tudo se mistura com a cor de fundo.
+    float fogAmount = clamp((length(viewPos - fragPosition) - fogStart) / max(fogEnd - fogStart, 0.001), 0.0, 1.0);
+    color = mix(color, fogColor, fogAmount);
+
     finalColor = vec4(color, texel.a);
 }
 )GLSL";
@@ -216,6 +226,9 @@ LightManager::LightManager()
     m_specularLoc   = GetShaderLocation(m_shader, "specularStrength");
     m_shadowBiasLoc = GetShaderLocation(m_shader, "shadowBias");
     m_shadowTexelLoc = GetShaderLocation(m_shader, "shadowTexel");
+    m_fogColorLoc   = GetShaderLocation(m_shader, "fogColor");
+    m_fogStartLoc   = GetShaderLocation(m_shader, "fogStart");
+    m_fogEndLoc     = GetShaderLocation(m_shader, "fogEnd");
 
     m_shader.locs[SHADER_LOC_MATRIX_MODEL] = GetShaderLocation(m_shader, "matModel");
     m_shader.locs[SHADER_LOC_VECTOR_VIEW]  = m_viewPosLoc;
@@ -335,7 +348,7 @@ ShadowMap& LightManager::EnsureShadowMap(int slot)
     return *m_shadows[slot];
 }
 
-void LightManager::RenderShadows(const std::function<void()>& drawDepth)
+void LightManager::RenderShadows(const std::function<void(const Frustum&)>& drawDepth)
 {
     // 0) Solta as texturas de sombra antes de escrever nelas (nunca ler e escrever a mesma textura).
     for (int k = 0; k < MaxShadowMaps; k++)
@@ -389,9 +402,21 @@ void LightManager::RenderShadows(const std::function<void()>& drawDepth)
     SetShaderValue(m_shader, m_shadowBiasLoc, &m_shadowBias, SHADER_UNIFORM_FLOAT);
 }
 
+void LightManager::SetFog(Color color, float start, float end)
+{
+    m_fogColor = color;
+    m_fogStart = start;
+    m_fogEnd = end;
+}
+
 void LightManager::Update(const Camera3D& camera)
 {
     const Vector3 ambient = ToVector3(m_ambientColor, m_ambientIntensity);
+    const Vector3 fogColor = ToVector3(m_fogColor, 1.0f);
+
+    SetShaderValue(m_shader, m_fogColorLoc, &fogColor, SHADER_UNIFORM_VEC3);
+    SetShaderValue(m_shader, m_fogStartLoc, &m_fogStart, SHADER_UNIFORM_FLOAT);
+    SetShaderValue(m_shader, m_fogEndLoc, &m_fogEnd, SHADER_UNIFORM_FLOAT);
 
     SetShaderValue(m_shader, m_viewPosLoc, &camera.position, SHADER_UNIFORM_VEC3);
     SetShaderValue(m_shader, m_ambientLoc, &ambient, SHADER_UNIFORM_VEC3);

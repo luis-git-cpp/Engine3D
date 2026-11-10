@@ -92,9 +92,21 @@ Camera3D ShadowMap::BuildLightCamera(const Light& light) const
     if (light.type == LightType::Directional)
     {
         // Raios paralelos: caixa ortografica de lado 2*raio, olhando para o centro da cena.
+        // O centro e "encaixado" na grade de texels do shadow map (nos eixos da luz). Sem isso, a
+        // sombra tremeria sempre que o foco (jogador) se move, porque os texels mudariam de lugar.
+        const Vector3 right = Vector3Normalize(Vector3CrossProduct(dir, cam.up));
+        const Vector3 up = Vector3CrossProduct(right, dir);
+        const float texel = (m_focusRadius * 2.0f) / static_cast<float>(m_resolution);
+
+        const float x = std::floor(Vector3DotProduct(m_focusCenter, right) / texel) * texel;
+        const float y = std::floor(Vector3DotProduct(m_focusCenter, up) / texel) * texel;
+        const float z = Vector3DotProduct(m_focusCenter, dir);
+        const Vector3 center = Vector3Add(Vector3Add(Vector3Scale(right, x), Vector3Scale(up, y)),
+                                          Vector3Scale(dir, z));
+
         cam.projection = CAMERA_ORTHOGRAPHIC;
-        cam.position = Vector3Subtract(m_focusCenter, Vector3Scale(dir, m_focusRadius * 2.0f));
-        cam.target = m_focusCenter;
+        cam.position = Vector3Subtract(center, Vector3Scale(dir, m_focusRadius * 2.0f));
+        cam.target = center;
         cam.fovy = m_focusRadius * 2.0f; // no modo ortografico, fovy e a altura da caixa
     }
     else
@@ -109,7 +121,7 @@ Camera3D ShadowMap::BuildLightCamera(const Light& light) const
     return cam;
 }
 
-void ShadowMap::Render(const Light& light, const std::function<void()>& drawDepth)
+void ShadowMap::Render(const Light& light, const std::function<void(const Frustum&)>& drawDepth)
 {
     if (!IsValid()) return;
 
@@ -122,13 +134,15 @@ void ShadowMap::Render(const Light& light, const std::function<void()>& drawDept
     BeginMode3D(cam);
     const Matrix view = rlGetMatrixModelview();
     const Matrix proj = rlGetMatrixProjection();
-    drawDepth();
+
+    // Matriz que leva um ponto do mundo para o espaco da luz (usada no shader e no culling).
+    m_lightVP = MatrixMultiply(view, proj);
+
+    drawDepth(Frustum::FromMatrix(m_lightVP));
     EndMode3D();
 
     EndTextureMode();
 
-    // Matriz que leva um ponto do mundo para o espaco da luz (usada no shader).
-    m_lightVP = MatrixMultiply(view, proj);
     ExtractClipPlanes(proj, m_perspective, m_near, m_far);
 }
 

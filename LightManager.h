@@ -49,8 +49,12 @@ public:
 
     // Passadas de profundidade: cada luz Directional/Spot ativa (com castShadows) recebe um shadow
     // map e a cena e renderizada do ponto de vista dela. Chamar todo frame, antes de desenhar a cena.
-    // drawDepth desenha a geometria (so profundidade).
-    void RenderShadows(const std::function<void()>& drawDepth);
+    // drawDepth desenha a geometria (so profundidade) e recebe o frustum da luz para fazer culling.
+    void RenderShadows(const std::function<void(const Frustum&)>& drawDepth);
+
+    // Neblina: do start ao end (em metros da camera) os objetos vao ficando da cor da neblina.
+    // Combine com a distancia de carregamento para esconder objetos aparecendo do nada.
+    void SetFog(Color color, float start, float end);
 
     // Envia camera, luz ambiente e todas as luzes para o shader. Chamar 1x por frame.
     void Update(const Camera3D& camera);
@@ -93,11 +97,18 @@ private:
     int m_specularLoc = -1;
     int m_shadowBiasLoc = -1;
     int m_shadowTexelLoc = -1;
+    int m_fogColorLoc = -1;
+    int m_fogStartLoc = -1;
+    int m_fogEndLoc = -1;
 
     bool m_shadowsEnabled = true;
     float m_shadowBias = 0.04f;
     Vector3 m_shadowCenter{0.0f, 0.0f, 0.0f};
     float m_shadowRadius = 15.0f;
+
+    Color m_fogColor = {0, 0, 0, 255};
+    float m_fogStart = 1.0e6f; // sem neblina ate chamar SetFog
+    float m_fogEnd = 2.0e6f;
 
     Color m_ambientColor = {255, 255, 255, 255};
     float m_ambientIntensity = 0.15f;

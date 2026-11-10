@@ -4,8 +4,10 @@
 #include <cmath>
 #include <string>
 
+#include "Frustum.h"
 #include "raylib.h"
 #include "raymath.h"
+#include "rlgl.h"
 
 namespace
 {
@@ -27,6 +29,14 @@ constexpr float kPushImpulse = 8.0f;             // clique: empurra o objeto mir
 constexpr float kHardImpactSpeed = 4.0f;         // impactos acima disso entram no registro de eventos
 constexpr std::size_t kMaxLogLines = 5;
 constexpr double kLogLifetime = 6.0;
+
+// Distancias do mundo grande. A neblina esconde o que esta chegando: o streaming carrega ate 7
+// celulas de 8 m (56 m) e a neblina ja cobre tudo a partir de 50 m, entao nada "aparece do nada".
+constexpr int kLoadRadiusCells = 7;
+constexpr float kFogStart = 22.0f;
+constexpr float kFogEnd = 50.0f;
+constexpr float kDrawDistance = 60.0f;   // alem disso nem chega a GPU (culling por distancia)
+constexpr float kShadowRadius = 15.0f;   // area em volta do jogador coberta pela sombra do sol
 } // namespace
 
 Application::Application(int width, int height, const std::string& title)
@@ -44,6 +54,7 @@ Application::Application(int width, int height, const std::string& title)
 {
     SetupLights();
     SetupMenus();
+    m_scene.SetStreamingRadius(kLoadRadiusCells);
 
     // Todos os eventos de colisao passam por aqui (alem do callback de cada objeto).
     m_physics.SetEventCallback([this](const CollisionEvent& e) { OnCollisionEvent(e); });
@@ -72,8 +83,11 @@ void Application::SetupLights()
                                     2.0f, 30.0f, 12.0f, 22.0f);
 
     // Sol, holofote e lanterna projetam sombra ao mesmo tempo (castShadows e true por padrao).
-    // Regiao coberta pela sombra do sol: centro e raio da cena (o piso tem 20x20).
-    m_lights.SetShadowFocus({0.0f, 0.0f, 0.0f}, 15.0f);
+    // A regiao coberta pela sombra do sol acompanha o jogador (ver UpdateLights).
+    m_lights.SetShadowFocus({0.0f, 0.0f, 0.0f}, kShadowRadius);
+
+    // Neblina da cor do fundo: esconde o limite do mundo carregado.
+    m_lights.SetFog({20, 22, 30, 255}, kFogStart, kFogEnd);
 }
 
 void Application::SetupMenus()
@@ -115,7 +129,7 @@ void Application::StartGame()
     // Cada "Iniciar" recria o mundo de demonstracao (as bolas caem de novo).
     m_spawned.clear();
     m_eventLog.clear();
-    m_scene.Reset();
+    m_scene.Reset(kPlayerStart); // recria o mundo e ja carrega o entorno do ponto inicial
 
     m_camera.Reset();
     m_player.Spawn(kPlayerStart, 0.0f);
@@ -159,6 +173,10 @@ void Application::Update()
     // Fisica: so roda durante o jogo (menus e pausa congelam o mundo).
     if (m_state == State::Playing)
         m_physics.Step(GetFrameTime());
+
+    // Streaming: carrega o que ficou perto e descarrega o que ficou longe.
+    if (m_state != State::Paused)
+        m_scene.Update(StreamFocus());
 
     // Libera de fato os objetos destruidos neste frame (por tecla, por queda ou por Reset).
     m_objects.CollectGarbage();
@@ -235,7 +253,8 @@ void Application::UpdatePlaying()
 
         case CameraMode::FirstPerson:
         case CameraMode::ThirdPerson:
-            m_player.Update(dt, lookEnabled);
+            if (m_player.Update(dt, lookEnabled))
+                m_scene.Prime(m_player.Position()); // caiu do mundo e voltou: carrega o chao antes de pisar
             m_camera.SetCamera(m_player.BuildCamera(m_cameraMode == CameraMode::ThirdPerson, dt));
             break;
     }
@@ -262,9 +281,21 @@ void Application::UpdatePaused()
     }
 }
 
+Vector3 Application::StreamFocus() const
+{
+    // Jogando como jogador: o foco sao os pes dele. Camera livre e menus: a propria camera.
+    if (m_state == State::Playing && m_cameraMode != CameraMode::Free)
+        return m_player.Position();
+
+    return m_camera.Get().position;
+}
+
 void Application::UpdateLights()
 {
     const Camera3D& cam = m_camera.Get();
+
+    // A sombra do sol cobre a regiao em volta do foco, entao tem que andar junto com ele.
+    m_lights.SetShadowFocus(StreamFocus(), kShadowRadius);
 
     if (Light* point = m_lights.Get(m_pointLight))
         point->position = {3.0f * std::cos(m_time), 1.5f, 3.0f * std::sin(m_time)};
@@ -288,8 +319,15 @@ void Application::HandleGameInput()
 
     if (IsKeyPressed(KEY_R))
     {
-        if (m_cameraMode == CameraMode::Free) m_camera.Reset();
-        else                                  m_player.Spawn(kPlayerStart, 0.0f);
+        if (m_cameraMode == CameraMode::Free)
+        {
+            m_camera.Reset();
+        }
+        else
+        {
+            m_player.Spawn(kPlayerStart, 0.0f);
+            m_scene.Prime(kPlayerStart); // o chao do ponto inicial pode estar descarregado
+        }
     }
 
     if (IsKeyPressed(KEY_FOUR))  ToggleLight(m_sunLight);
@@ -302,6 +340,7 @@ void Application::HandleGameInput()
     if (IsKeyPressed(KEY_N))     SpawnBall(1);
     if (IsKeyPressed(KEY_X))     DestroyLastSpawned();
     if (IsKeyPressed(KEY_NINE))  m_showColliders = !m_showColliders;
+    if (IsKeyPressed(KEY_ZERO))  m_showCells = !m_showCells;
 }
 
 void Application::SetCameraMode(CameraMode mode)
@@ -497,16 +536,22 @@ void Application::Draw()
     BeginDrawing();
 
     // Passada 1: uma passada de profundidade por luz que projeta sombra (sol e spots).
-    m_lights.RenderShadows([this] { m_scene.DrawDepth(); });
+    m_lights.RenderShadows([this](const Frustum& lightFrustum) { m_scene.DrawDepth(lightFrustum); });
 
     // Passada 2: cena vista da camera, comparando a profundidade de cada pixel com os shadow maps.
     ClearBackground({20, 22, 30, 255});
 
     BeginMode3D(m_camera.Get());
-    m_scene.Draw();
+
+    // Frustum da camera (mesma matriz que o raylib usa): so desenha o que a camera enxerga.
+    const Frustum frustum = Frustum::FromMatrix(MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection()));
+    m_scene.Draw(frustum, m_camera.Get().position, kDrawDistance);
+
     m_lights.DrawGizmos();
     if (m_showColliders)
         m_physics.DrawDebug();
+    if (m_showCells)
+        m_scene.DrawStreamingDebug(StreamFocus());
     if (m_state == State::Playing && m_aimHit.hit)
         DrawSphere(m_aimHit.point, 0.05f, YELLOW); // ponto onde o raio da mira acertou
     EndMode3D();
@@ -555,8 +600,10 @@ void Application::DrawHud() const
 
     const CellCoord cell = m_objects.Coordinates().ToCell(m_camera.Get().position);
 
-    m_font.Draw(TextFormat("FPS: %d | Objetos: %d | Celula: (%d, %d, %d)", GetFPS(), m_objects.Count(),
-                           cell.x, cell.y, cell.z),
+    m_font.Draw(TextFormat("FPS: %d | Celula: (%d, %d, %d)", GetFPS(), cell.x, cell.y, cell.z), {x, y}, size);
+    y += step;
+    m_font.Draw(TextFormat("Objetos: %d | Desenhados: %d | Mundo: %d/%d carregados", m_objects.Count(),
+                           m_scene.DrawnCount(), m_scene.LoadedCount(), m_scene.RegisteredCount()),
                 {x, y}, size);
     y += step;
     m_font.Draw("WASD: mover | SHIFT: correr | ESPACO: pular | CLIQUE: empurrar | R: reiniciar jogador", {x, y}, size);
@@ -567,7 +614,7 @@ void Application::DrawHud() const
                            m_lights.ShadowsEnabled() ? "ligadas" : "desligadas"),
                 {x, y}, size);
     y += step;
-    m_font.Draw("B/N: bola camada 0/1 | X: destruir | 9: colisores", {x, y}, size);
+    m_font.Draw("B/N: bola camada 0/1 | X: destruir | 9: colisores | 0: celulas do mundo", {x, y}, size);
 }
 
 // Mira no centro da tela e o nome do que esta sendo mirado (resultado do raycast).
