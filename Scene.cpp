@@ -39,6 +39,9 @@ Scene::Scene(ObjectManager& objects, PhysicsWorld& physics)
     m_depthMaterial = LoadMaterialDefault();
     Build();
     m_streamer.Prime({0.0f, 0.0f, 0.0f});
+    m_streamer.SetMaxLoadsPerFrame(10);
+    m_streamer.SetUnloadMargin(2);
+
 }
 
 Scene::~Scene()

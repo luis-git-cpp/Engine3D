@@ -117,6 +117,7 @@ ObjectId ObjectManager::CreateFromModel(Model model, const ObjectParams& params)
     m_lights.ApplyTo(obj->model);
 
     BuildCollider(*obj, params);
+    obj->rigidBody.UpdateInertiaFromCollider(obj->collider, obj->scale);
     Reindex(*obj);
 
     const ObjectId id = obj->id;

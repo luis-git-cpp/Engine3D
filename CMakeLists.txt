@@ -34,10 +34,14 @@ add_executable(${PROJECT_NAME}
     ObjectManager.cpp
     PhysicsWorld.cpp
     PlayerController.cpp
+    Renderer.cpp
+    RigidBody.cpp
     Scene.cpp
     ShadowMap.cpp
+    Transform.cpp
     UiFont.cpp
     Window.cpp
+    WorldStreamer.cpp
 )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE raylib Threads::Threads)
