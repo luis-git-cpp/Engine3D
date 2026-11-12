@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Usa o raylib instalado no sistema; se nao houver, baixa e compila automaticamente.
 # (Requer raylib 5.0 ou mais novo: usa ToggleBorderlessWindowed.)
+find_package(Threads REQUIRED)
 find_package(raylib 5.0 QUIET)
 if (NOT raylib_FOUND)
     include(FetchContent)
@@ -22,6 +23,7 @@ endif()
 add_executable(${PROJECT_NAME}
     main.cpp
     Application.cpp
+    AsyncLoader.cpp
     Assets.cpp
     CameraController.cpp
     Collision.cpp
@@ -38,7 +40,7 @@ add_executable(${PROJECT_NAME}
     Window.cpp
 )
 
-target_link_libraries(${PROJECT_NAME} PRIVATE raylib)
+target_link_libraries(${PROJECT_NAME} PRIVATE raylib Threads::Threads)
 
 # Copia a pasta resources (fonte, modelos) para ao lado do executavel.
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD

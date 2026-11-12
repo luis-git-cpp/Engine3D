@@ -78,6 +78,8 @@ void Scene::Build()
 
     // Tudo abaixo e apenas REGISTRADO: o WorldStreamer cria cada objeto quando o jogador chega
     // perto e o destroi quando ele se afasta (objetos dinamicos voltam do jeito que ficaram).
+    // Helper para criar LODs de primitivas (cubo próximo / cubo distante)
+
     auto add = [this](PrimitiveType type, Vector3 size, const ObjectParams& params) {
         ObjectSpec spec;
         spec.kind = ObjectSpec::Kind::Primitive;
@@ -245,9 +247,6 @@ void Scene::Build()
                 if (kind < 0.40f)
                 {
                     const float s = rng.Range(1.0f, 3.0f);
-                    p.name = "bloco";
-                    p.position = {x, s * 0.5f, z};
-                    add(PrimitiveType::Cube, {s, s, s}, p);
                 }
                 else if (kind < 0.75f)
                 {

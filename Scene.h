@@ -38,10 +38,12 @@ public:
     void DrawStreamingDebug(Vector3 focus) const;
 
     // Estatisticas para o HUD.
+    int AsyncPending() const { return m_streamer.AsyncPending(); }
     int DrawnCount() const { return m_drawnCount; }
     int LoadedCount() const { return m_streamer.LoadedCount(); }
     int RegisteredCount() const { return m_streamer.RegisteredCount(); }
     int PendingCount() const { return m_streamer.PendingCount(); }
+    int TotalLoadedLods() const { return m_streamer.TotalLoadedLods(); }
 
     void SetStreamingRadius(int cells) { m_streamer.SetLoadRadius(cells); }
 

@@ -11,6 +11,7 @@
 #include "GameObject.h"
 #include "LightManager.h"
 #include "raylib.h"
+#include <unordered_map>
 
 enum class PrimitiveType
 {
@@ -69,6 +70,7 @@ public:
     ObjectId CreateFromFile(const std::string& modelPath, const ObjectParams& params);
     // Modelo ja carregado: o ObjectManager assume a posse e descarrega ao destruir o objeto.
     ObjectId CreateFromModel(Model model, const ObjectParams& params);
+    // Carrega (ou reusa do cache) o modelo. Incrementa refCount.
 
     // --- Destruicao ---
     // Marca o objeto; ele some na hora (Get devolve nullptr) e e liberado em CollectGarbage().

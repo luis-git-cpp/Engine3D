@@ -615,6 +615,19 @@ void Application::DrawHud() const
                 {x, y}, size);
     y += step;
     m_font.Draw("B/N: bola camada 0/1 | X: destruir | 9: colisores | 0: celulas do mundo", {x, y}, size);
+    y += step;
+
+    m_font.Draw(TextFormat("Objetos: %d | Desenhados: %d | Mundo: %d/%d carregados | Async: %d",
+                           m_objects.Count(), m_scene.DrawnCount(),
+                           m_scene.LoadedCount(), m_scene.RegisteredCount(),
+                           m_scene.AsyncPending()),
+                {x, y}, size);
+    y += step;
+    m_font.Draw(TextFormat("Async: %d | LODs carregados: %d",
+                            m_scene.AsyncPending(),
+                            m_scene.TotalLoadedLods()),
+                {x, y}, size);
+    y += step;
 }
 
 // Mira no centro da tela e o nome do que esta sendo mirado (resultado do raycast).
